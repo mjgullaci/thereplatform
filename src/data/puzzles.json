@@ -1,0 +1,58 @@
+[
+  {
+    "id": "p001",
+    "theme": "Garden Path",
+    "letters": ["P", "L", "A", "N", "T", "S"],
+    "bonus": "PLANTS",
+    "required": ["NAP", "PAN", "TAP", "ANT", "PAL", "PLAN", "SLAP", "SNAP", "PLANT", "PLANTS"],
+    "extras": ["ALP", "LAP", "PAT", "SAP", "SPA", "TAN", "ANTS", "LAPS", "LAST", "PALS", "PANS", "PANT", "PAST", "PATS", "PLAT", "SLAT", "SPAN", "SPAT", "TANS", "TAPS", "NAPS", "PLANS", "PLATS", "SLANT", "SPLAT", "PANTS"]
+  },
+  {
+    "id": "p002",
+    "theme": "Morning Tide",
+    "letters": ["O", "C", "E", "A", "N", "S"],
+    "bonus": "OCEANS",
+    "required": ["CAN", "CONE", "NOSE", "ONCE", "SCAN", "CANE", "OCEAN", "CANES", "SCONE", "OCEANS"],
+    "extras": ["ACE", "ACES", "CON", "EON", "EONS", "ONE", "ONES", "SEA", "SON", "ACNE", "AEON", "AEONS", "CANS", "CASE", "CONS", "NOES", "OCAS"]
+  },
+  {
+    "id": "p003",
+    "theme": "Going Places",
+    "letters": ["T", "R", "A", "V", "E", "L"],
+    "bonus": "TRAVEL",
+    "required": ["ATE", "EAR", "EAT", "TEA", "LATE", "RATE", "TALE", "ALERT", "ALTER", "TRAVEL"],
+    "extras": ["ALE", "ARE", "ART", "ERA", "LET", "RAT", "TAR", "AVE", "VAT", "LATER", "RAVE", "VALE", "VEAL", "RAVEL", "AVERT", "VALET"]
+  },
+  {
+    "id": "p004",
+    "theme": "Daydream",
+    "letters": ["D", "R", "E", "A", "M", "S"],
+    "bonus": "DREAMS",
+    "required": ["READ", "DEAR", "DARE", "MARE", "MADE", "DREAM", "ARMED", "SMEAR", "READS", "DREAMS"],
+    "extras": ["ARE", "ARM", "EAR", "ERA", "MAD", "MAR", "RAM", "RED", "SAD", "SEA", "ARMS", "DAMS", "DAME", "DARES", "DEARS", "MARS", "REAM", "RAMS", "SAME", "MARES", "DAMES", "REAMS"]
+  },
+  {
+    "id": "p005",
+    "theme": "Hearth & Home",
+    "letters": ["C", "A", "N", "D", "L", "E"],
+    "bonus": "CANDLE",
+    "required": ["AND", "CAN", "CANE", "DEAL", "LACE", "LEAN", "CLEAN", "DANCE", "LANCE", "CANDLE"],
+    "extras": ["ACE", "ALE", "CAD", "DEN", "LAD", "LED", "ACED", "CLAD", "CLAN", "DALE", "DEAN", "LACED", "LEAD", "DECAL", "LANCED"]
+  },
+  {
+    "id": "p006",
+    "theme": "Coastal Light",
+    "letters": ["M", "A", "R", "I", "N", "E"],
+    "bonus": "MARINE",
+    "required": ["AIM", "ARM", "MAN", "RAIN", "MAIN", "NAME", "NEAR", "MINER", "MARINE", "REMAIN"],
+    "extras": ["AIR", "ARE", "EAR", "ERA", "IRE", "MAR", "MEN", "AMEN", "MANE", "MINE", "NAMER", "RAMEN", "REIN", "AIRMEN", "ANIME"]
+  },
+  {
+    "id": "p007",
+    "theme": "Old Friends",
+    "letters": ["F", "R", "I", "E", "N", "D"],
+    "bonus": "FRIEND",
+    "required": ["DEN", "FED", "FIN", "FIR", "DINE", "FIRE", "FIND", "FIEND", "FINER", "FRIEND"],
+    "extras": ["DIE", "DIN", "FEN", "FIE", "IRE", "RED", "RID", "REIN", "RIDE", "RIND", "DINER", "FERN", "FIRED", "INFER", "NERD", "RIFE", "FRIED"]
+  }
+]

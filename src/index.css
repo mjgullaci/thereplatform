@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: #fdf6ec;
+  color: #3b2a20;
+  font-family: Georgia, Cambria, 'Times New Roman', serif;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* Keep the wheel snappy on touch */
+svg {
+  -webkit-user-select: none;
+  user-select: none;
+}

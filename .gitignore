@@ -1,0 +1,17 @@
+node_modules
+dist
+dist-ssr
+.DS_Store
+*.log
+.env
+.env.local
+.vite
+ios/
+android/
+.idea
+.vscode
+
+# TypeScript build artifacts (from tsc -b)
+*.tsbuildinfo
+vite.config.d.ts
+vite.config.js
