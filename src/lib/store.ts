@@ -3,13 +3,24 @@ import { loadState, saveState, PersistedState } from './storage';
 import { daysBetween, todayKey } from './words';
 
 interface GameState extends PersistedState {
-  recordWin: (puzzleId: string, foundWords: string[]) => void;
+  recordWin: (puzzleId: string) => void;
   appendFoundWord: (puzzleId: string, word: string) => void;
   setLargeText: (v: boolean) => void;
   getFoundWords: (puzzleId: string) => string[];
 }
 
 const initial = loadState();
+
+function snapshot(get: () => GameState): PersistedState {
+  return {
+    streak: get().streak,
+    lastPlayedDate: get().lastPlayedDate,
+    solved: get().solved,
+    solvedIds: get().solvedIds,
+    largeText: get().largeText,
+    totalSolved: get().totalSolved,
+  };
+}
 
 export const useGame = create<GameState>((set, get) => ({
   ...initial,
@@ -18,18 +29,11 @@ export const useGame = create<GameState>((set, get) => ({
     const current = get().solved[puzzleId] ?? [];
     if (current.includes(word)) return;
     const solved = { ...get().solved, [puzzleId]: [...current, word] };
-    const next: PersistedState = {
-      streak: get().streak,
-      lastPlayedDate: get().lastPlayedDate,
-      solved,
-      largeText: get().largeText,
-      totalSolved: get().totalSolved,
-    };
     set({ solved });
-    saveState(next);
+    saveState({ ...snapshot(get), solved });
   },
 
-  recordWin: (puzzleId, foundWords) => {
+  recordWin: (puzzleId) => {
     const today = todayKey();
     const last = get().lastPlayedDate;
     let streak = get().streak;
@@ -37,37 +41,28 @@ export const useGame = create<GameState>((set, get) => ({
       streak = 1;
     } else {
       const gap = daysBetween(last, today);
-      if (gap === 0) {
-        // already counted today
-      } else if (gap === 1) {
-        streak += 1;
-      } else if (gap > 1) {
-        streak = 1;
-      }
+      if (gap === 1) streak += 1;
+      else if (gap > 1) streak = 1;
+      // gap === 0: same day, leave streak alone
     }
-    const solved = { ...get().solved, [puzzleId]: foundWords };
-    const totalSolved = get().totalSolved + (get().solved[puzzleId] ? 0 : 1);
-    const next: PersistedState = {
+
+    const isNewWin = !get().solvedIds.includes(puzzleId);
+    const solvedIds = isNewWin ? [...get().solvedIds, puzzleId] : get().solvedIds;
+    const totalSolved = isNewWin ? get().totalSolved + 1 : get().totalSolved;
+
+    set({ streak, lastPlayedDate: today, solvedIds, totalSolved });
+    saveState({
+      ...snapshot(get),
       streak,
       lastPlayedDate: today,
-      solved,
-      largeText: get().largeText,
+      solvedIds,
       totalSolved,
-    };
-    set({ streak, lastPlayedDate: today, solved, totalSolved });
-    saveState(next);
+    });
   },
 
   setLargeText: (v) => {
-    const next: PersistedState = {
-      streak: get().streak,
-      lastPlayedDate: get().lastPlayedDate,
-      solved: get().solved,
-      largeText: v,
-      totalSolved: get().totalSolved,
-    };
     set({ largeText: v });
-    saveState(next);
+    saveState({ ...snapshot(get), largeText: v });
   },
 
   getFoundWords: (puzzleId) => get().solved[puzzleId] ?? [],

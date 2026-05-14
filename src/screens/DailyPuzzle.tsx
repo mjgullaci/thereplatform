@@ -1,30 +1,67 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { LetterWheel } from '@/components/LetterWheel';
 import { FoundWordsList } from '@/components/FoundWordsList';
 import { ProgressBar } from '@/components/ProgressBar';
 import { useGame } from '@/lib/store';
 import {
+  getPuzzleByIndex,
   getPuzzleForDate,
+  getTotalPuzzles,
   isPuzzleComplete,
   validateGuess,
 } from '@/lib/puzzles';
 
 type Toast = { id: number; text: string; tone: 'good' | 'bad' | 'bonus' };
 
+function randomOtherIndex(current: number): number {
+  const n = getTotalPuzzles();
+  if (n <= 1) return current;
+  let next = current;
+  while (next === current) {
+    next = Math.floor(Math.random() * n);
+  }
+  return next;
+}
+
 export function DailyPuzzle() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  const isPractice = searchParams.get('practice') === '1';
+  const requestedIndex = Number.parseInt(searchParams.get('i') ?? '', 10);
+
   const largeText = useGame((s) => s.largeText);
   const appendFoundWord = useGame((s) => s.appendFoundWord);
   const recordWin = useGame((s) => s.recordWin);
-  const solved = useGame((s) => s.solved);
+  const persistentSolved = useGame((s) => s.solved);
 
-  const puzzle = useMemo(() => getPuzzleForDate(new Date()), []);
-  const found = solved[puzzle.id] ?? [];
+  const { puzzle, puzzleIndex } = useMemo(() => {
+    if (isPractice) {
+      const idx = Number.isFinite(requestedIndex)
+        ? Math.max(0, Math.min(requestedIndex, getTotalPuzzles() - 1))
+        : 0;
+      return { puzzle: getPuzzleByIndex(idx), puzzleIndex: idx };
+    }
+    return { puzzle: getPuzzleForDate(new Date()), puzzleIndex: -1 };
+  }, [isPractice, requestedIndex]);
+
+  const [practiceFound, setPracticeFound] = useState<string[]>([]);
+  useEffect(() => {
+    setPracticeFound([]);
+  }, [puzzle.id]);
+
+  const persistentFound = persistentSolved[puzzle.id] ?? [];
+  const found = isPractice ? practiceFound : persistentFound;
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [shuffleSeed, setShuffleSeed] = useState(0);
   const [won, setWon] = useState(() => isPuzzleComplete(puzzle, found));
+
+  useEffect(() => {
+    setWon(isPuzzleComplete(puzzle, found));
+  }, [puzzle, found]);
 
   const shuffledLetters = useMemo(() => {
     if (shuffleSeed === 0) return puzzle.letters;
@@ -34,51 +71,43 @@ export function DailyPuzzle() {
       [arr[i], arr[j]] = [arr[j], arr[i]];
     }
     return arr;
-    // shuffleSeed intentionally re-runs this
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shuffleSeed, puzzle.letters]);
 
   useEffect(() => {
-    if (!won && isPuzzleComplete(puzzle, found)) {
-      setWon(true);
-      recordWin(puzzle.id, found);
+    if (!isPractice && isPuzzleComplete(puzzle, persistentFound)) {
+      recordWin(puzzle.id);
     }
-  }, [found, puzzle, recordWin, won]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persistentFound.length, puzzle.id, isPractice]);
 
   const pushToast = (text: string, tone: Toast['tone']) => {
     const id = Date.now() + Math.random();
     setToasts((t) => [...t, { id, text, tone }]);
-    setTimeout(() => {
-      setToasts((t) => t.filter((x) => x.id !== id));
-    }, 1400);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 1400);
   };
 
   const handleSubmit = (word: string) => {
     const result = validateGuess(puzzle, word);
-    if (result.status === 'too-short') {
-      pushToast('Too short', 'bad');
-      return;
-    }
-    if (result.status === 'unspellable') {
-      pushToast('Not in the wheel', 'bad');
-      return;
-    }
-    if (found.includes(result.word)) {
-      pushToast('Already found', 'bad');
-      return;
-    }
-    if (result.status === 'unknown') {
-      pushToast('Not a word we know', 'bad');
-      return;
-    }
-    appendFoundWord(puzzle.id, result.word);
-    if (result.status === 'bonus') {
-      pushToast(`Bonus! ${result.word}`, 'bonus');
-    } else if (result.status === 'extra') {
-      pushToast(`+ Bonus word: ${result.word}`, 'good');
+    if (result.status === 'too-short') return pushToast('Too short', 'bad');
+    if (result.status === 'unspellable') return pushToast('Not in the wheel', 'bad');
+    if (found.includes(result.word)) return pushToast('Already found', 'bad');
+    if (result.status === 'unknown') return pushToast('Not a word we know', 'bad');
+
+    if (isPractice) {
+      setPracticeFound((prev) => (prev.includes(result.word) ? prev : [...prev, result.word]));
     } else {
-      pushToast(`+ ${result.word}`, 'good');
+      appendFoundWord(puzzle.id, result.word);
     }
+
+    if (result.status === 'bonus') pushToast(`Bonus! ${result.word}`, 'bonus');
+    else if (result.status === 'extra') pushToast(`+ Bonus word: ${result.word}`, 'good');
+    else pushToast(`+ ${result.word}`, 'good');
+  };
+
+  const goToAnotherPractice = () => {
+    const next = randomOtherIndex(isPractice ? puzzleIndex : -1);
+    navigate(`/play?practice=1&i=${next}`, { replace: true });
   };
 
   const requiredCount = puzzle.required.length;
@@ -87,7 +116,9 @@ export function DailyPuzzle() {
   return (
     <section className="flex-1 flex flex-col items-center pt-4 pb-8 gap-5 relative">
       <div className="text-center">
-        <div className="text-cocoa/60 text-sm uppercase tracking-widest">Today's theme</div>
+        <div className="text-cocoa/60 text-sm uppercase tracking-widest">
+          {isPractice ? 'Practice' : "Today's theme"}
+        </div>
         <div className={`font-display text-cocoa ${largeText ? 'text-3xl' : 'text-2xl'}`}>
           {puzzle.theme}
         </div>
@@ -141,21 +172,30 @@ export function DailyPuzzle() {
               className="bg-cream rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl"
             >
               <div className="text-cocoa/60 uppercase tracking-widest text-sm mb-2">
-                Puzzle solved
+                {isPractice ? 'Practice complete' : 'Puzzle solved'}
               </div>
               <div className={`font-display text-cocoa ${largeText ? 'text-3xl' : 'text-2xl'} mb-3`}>
                 {puzzle.theme}
               </div>
               <p className="text-cocoa/80 mb-6">
-                You found {found.length} word{found.length === 1 ? '' : 's'} today. Come back
-                tomorrow for a new puzzle.
+                {isPractice
+                  ? `You found ${found.length} word${found.length === 1 ? '' : 's'}.`
+                  : `You found ${found.length} word${found.length === 1 ? '' : 's'} today. Come back tomorrow for a new puzzle.`}
               </p>
-              <Link
-                to="/"
-                className="inline-block rounded-full bg-cocoa text-cream px-8 py-3 font-display text-xl"
-              >
-                Home
-              </Link>
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={goToAnotherPractice}
+                  className="rounded-full bg-cocoa text-cream px-8 py-3 font-display text-xl"
+                >
+                  Try another puzzle
+                </button>
+                <Link
+                  to="/"
+                  className="rounded-full border-2 border-cocoa/30 text-cocoa px-8 py-3 font-display text-lg"
+                >
+                  Home
+                </Link>
+              </div>
             </motion.div>
           </motion.div>
         )}

@@ -21,10 +21,15 @@ export function getPuzzleByIndex(index: number): Puzzle {
 }
 
 export function getPuzzleForDate(date: Date): Puzzle {
+  return getPuzzleByIndex(getDateIndex(date));
+}
+
+export function getDateIndex(date: Date): number {
   // Anchor on Jan 1 2026 so puzzle ids stay stable across timezones.
   const epoch = new Date(2026, 0, 1).getTime();
   const day = Math.floor((date.getTime() - epoch) / 86_400_000);
-  return getPuzzleByIndex(day);
+  const n = PUZZLES.length;
+  return ((day % n) + n) % n;
 }
 
 export function getTotalPuzzles(): number {

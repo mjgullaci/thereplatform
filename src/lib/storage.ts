@@ -4,6 +4,7 @@ export interface PersistedState {
   streak: number;
   lastPlayedDate: string | null;
   solved: Record<string, string[]>;
+  solvedIds: string[];
   largeText: boolean;
   totalSolved: number;
 }
@@ -12,6 +13,7 @@ const defaults: PersistedState = {
   streak: 0,
   lastPlayedDate: null,
   solved: {},
+  solvedIds: [],
   largeText: false,
   totalSolved: 0,
 };
