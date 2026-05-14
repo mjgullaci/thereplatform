@@ -110,6 +110,30 @@ export function DailyPuzzle() {
     navigate(`/play?practice=1&i=${next}`, { replace: true });
   };
 
+  const handleShare = async () => {
+    const required = puzzle.required.length;
+    const url = `${window.location.origin}/`;
+    const title = `Wordwell — ${puzzle.theme}`;
+    const body = isPractice
+      ? `Solved a Wordwell practice puzzle: ${puzzle.theme}. Found ${found.length} words.\n${url}`
+      : `Solved today's Wordwell: ${puzzle.theme}. ${found.length} of ${required} required words found.\n${url}`;
+
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ title, text: body, url });
+        return;
+      } catch (err) {
+        if ((err as DOMException)?.name === 'AbortError') return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(body);
+      pushToast('Copied to clipboard', 'good');
+    } catch {
+      pushToast('Could not copy', 'bad');
+    }
+  };
+
   const requiredCount = puzzle.required.length;
   const requiredFound = puzzle.required.filter((w) => found.includes(w)).length;
 
@@ -184,14 +208,20 @@ export function DailyPuzzle() {
               </p>
               <div className="flex flex-col gap-3">
                 <button
+                  onClick={handleShare}
+                  className="rounded-full bg-moss text-cream px-8 py-3 font-display text-xl"
+                >
+                  Share result
+                </button>
+                <button
                   onClick={goToAnotherPractice}
-                  className="rounded-full bg-cocoa text-cream px-8 py-3 font-display text-xl"
+                  className="rounded-full bg-cocoa text-cream px-8 py-3 font-display text-lg"
                 >
                   Try another puzzle
                 </button>
                 <Link
                   to="/"
-                  className="rounded-full border-2 border-cocoa/30 text-cocoa px-8 py-3 font-display text-lg"
+                  className="rounded-full border-2 border-cocoa/30 text-cocoa px-8 py-3 font-display text-base"
                 >
                   Home
                 </Link>

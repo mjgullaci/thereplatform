@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#5b3a29"/>
+  <circle cx="256" cy="256" r="220" fill="#fdf6ec" stroke="#d4a24c" stroke-width="10"/>
+  <text x="256" y="330" text-anchor="middle"
+        font-family="Georgia, 'Times New Roman', serif"
+        font-weight="700" font-size="280" fill="#5b3a29">W</text>
+  <path d="M 170 405 Q 256 380 342 405"
+        stroke="#6b8e4e" stroke-width="10" fill="none" stroke-linecap="round"/>
+  <circle cx="170" cy="405" r="8" fill="#6b8e4e"/>
+  <circle cx="342" cy="405" r="8" fill="#6b8e4e"/>
+</svg>
