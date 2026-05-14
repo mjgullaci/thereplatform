@@ -7,6 +7,9 @@ export interface PersistedState {
   solvedIds: string[];
   largeText: boolean;
   totalSolved: number;
+  hints: number;
+  isPremium: boolean;
+  revealedLetters: Record<string, Record<string, number>>;
 }
 
 const defaults: PersistedState = {
@@ -16,6 +19,9 @@ const defaults: PersistedState = {
   solvedIds: [],
   largeText: false,
   totalSolved: 0,
+  hints: 3,
+  isPremium: false,
+  revealedLetters: {},
 };
 
 export function loadState(): PersistedState {

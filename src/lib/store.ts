@@ -7,6 +7,10 @@ interface GameState extends PersistedState {
   appendFoundWord: (puzzleId: string, word: string) => void;
   setLargeText: (v: boolean) => void;
   getFoundWords: (puzzleId: string) => string[];
+  useHint: (puzzleId: string, word: string) => boolean;
+  addHints: (n: number) => void;
+  grantPremium: () => void;
+  revokePremium: () => void;
 }
 
 const initial = loadState();
@@ -19,6 +23,9 @@ function snapshot(get: () => GameState): PersistedState {
     solvedIds: get().solvedIds,
     largeText: get().largeText,
     totalSolved: get().totalSolved,
+    hints: get().hints,
+    isPremium: get().isPremium,
+    revealedLetters: get().revealedLetters,
   };
 }
 
@@ -43,7 +50,6 @@ export const useGame = create<GameState>((set, get) => ({
       const gap = daysBetween(last, today);
       if (gap === 1) streak += 1;
       else if (gap > 1) streak = 1;
-      // gap === 0: same day, leave streak alone
     }
 
     const isNewWin = !get().solvedIds.includes(puzzleId);
@@ -63,6 +69,40 @@ export const useGame = create<GameState>((set, get) => ({
   setLargeText: (v) => {
     set({ largeText: v });
     saveState({ ...snapshot(get), largeText: v });
+  },
+
+  useHint: (puzzleId, word) => {
+    const isPremium = get().isPremium;
+    const hints = get().hints;
+    if (!isPremium && hints <= 0) return false;
+
+    const puzzleReveals = { ...(get().revealedLetters[puzzleId] ?? {}) };
+    const current = puzzleReveals[word] ?? 0;
+    if (current >= word.length) return false;
+    puzzleReveals[word] = current + 1;
+
+    const revealedLetters = { ...get().revealedLetters, [puzzleId]: puzzleReveals };
+    const nextHints = isPremium ? hints : hints - 1;
+
+    set({ revealedLetters, hints: nextHints });
+    saveState({ ...snapshot(get), revealedLetters, hints: nextHints });
+    return true;
+  },
+
+  addHints: (n) => {
+    const hints = Math.max(0, get().hints + n);
+    set({ hints });
+    saveState({ ...snapshot(get), hints });
+  },
+
+  grantPremium: () => {
+    set({ isPremium: true });
+    saveState({ ...snapshot(get), isPremium: true });
+  },
+
+  revokePremium: () => {
+    set({ isPremium: false });
+    saveState({ ...snapshot(get), isPremium: false });
   },
 
   getFoundWords: (puzzleId) => get().solved[puzzleId] ?? [],

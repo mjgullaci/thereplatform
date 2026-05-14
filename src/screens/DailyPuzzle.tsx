@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { LetterWheel } from '@/components/LetterWheel';
 import { FoundWordsList } from '@/components/FoundWordsList';
 import { ProgressBar } from '@/components/ProgressBar';
+import { HintButton } from '@/components/HintButton';
 import { useGame } from '@/lib/store';
 import {
   getPuzzleByIndex,
@@ -36,6 +37,10 @@ export function DailyPuzzle() {
   const appendFoundWord = useGame((s) => s.appendFoundWord);
   const recordWin = useGame((s) => s.recordWin);
   const persistentSolved = useGame((s) => s.solved);
+  const persistentReveals = useGame((s) => s.revealedLetters);
+  const hints = useGame((s) => s.hints);
+  const isPremium = useGame((s) => s.isPremium);
+  const useHintAction = useGame((s) => s.useHint);
 
   const { puzzle, puzzleIndex } = useMemo(() => {
     if (isPractice) {
@@ -48,12 +53,15 @@ export function DailyPuzzle() {
   }, [isPractice, requestedIndex]);
 
   const [practiceFound, setPracticeFound] = useState<string[]>([]);
+  const [practiceReveals, setPracticeReveals] = useState<Record<string, number>>({});
   useEffect(() => {
     setPracticeFound([]);
+    setPracticeReveals({});
   }, [puzzle.id]);
 
   const persistentFound = persistentSolved[puzzle.id] ?? [];
   const found = isPractice ? practiceFound : persistentFound;
+  const revealed = isPractice ? practiceReveals : (persistentReveals[puzzle.id] ?? {});
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [shuffleSeed, setShuffleSeed] = useState(0);
@@ -105,6 +113,37 @@ export function DailyPuzzle() {
     else pushToast(`+ ${result.word}`, 'good');
   };
 
+  const handleHint = () => {
+    if (!isPremium && hints <= 0) {
+      navigate('/premium');
+      return;
+    }
+    const candidates = puzzle.required.filter((w) => {
+      if (found.includes(w)) return false;
+      const r = revealed[w] ?? 0;
+      return r < w.length;
+    });
+    if (candidates.length === 0) {
+      pushToast('No hints needed', 'good');
+      return;
+    }
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+
+    if (isPractice) {
+      // In practice, hints are free and stored locally.
+      setPracticeReveals((prev) => ({ ...prev, [pick]: (prev[pick] ?? 0) + 1 }));
+      pushToast(`Revealed a letter in ${pick.length}-letter word`, 'good');
+      return;
+    }
+
+    const ok = useHintAction(puzzle.id, pick);
+    if (!ok) {
+      pushToast('Could not use hint', 'bad');
+      return;
+    }
+    pushToast(`Revealed a letter in ${pick.length}-letter word`, 'good');
+  };
+
   const goToAnotherPractice = () => {
     const next = randomOtherIndex(isPractice ? puzzleIndex : -1);
     navigate(`/play?practice=1&i=${next}`, { replace: true });
@@ -152,14 +191,27 @@ export function DailyPuzzle() {
 
       <LetterWheel letters={shuffledLetters} onSubmit={handleSubmit} largeText={largeText} />
 
-      <button
-        onClick={() => setShuffleSeed((n) => n + 1)}
-        className="rounded-full border-2 border-cocoa/30 text-cocoa px-4 py-2 text-sm tracking-wider uppercase"
-      >
-        Shuffle
-      </button>
+      <div className="flex gap-3 items-center">
+        <button
+          onClick={() => setShuffleSeed((n) => n + 1)}
+          className="rounded-full border-2 border-cocoa/30 text-cocoa px-4 py-2 text-sm tracking-wider uppercase"
+        >
+          Shuffle
+        </button>
+        <HintButton
+          hints={hints}
+          isPremium={isPremium || isPractice}
+          disabled={won}
+          onClick={handleHint}
+        />
+      </div>
 
-      <FoundWordsList required={puzzle.required} found={found} largeText={largeText} />
+      <FoundWordsList
+        required={puzzle.required}
+        found={found}
+        revealed={revealed}
+        largeText={largeText}
+      />
 
       <AnimatePresence>
         {toasts.map((t) => (

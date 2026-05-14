@@ -3,10 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface FoundWordsListProps {
   required: string[];
   found: string[];
+  revealed: Record<string, number>;
   largeText: boolean;
 }
 
-export function FoundWordsList({ required, found, largeText }: FoundWordsListProps) {
+export function FoundWordsList({ required, found, revealed, largeText }: FoundWordsListProps) {
   const foundSet = new Set(found);
 
   return (
@@ -18,6 +19,12 @@ export function FoundWordsList({ required, found, largeText }: FoundWordsListPro
         <AnimatePresence initial={false}>
           {required.map((word) => {
             const isFound = foundSet.has(word);
+            const revealCount = revealed[word] ?? 0;
+            const display = isFound
+              ? word
+              : revealCount > 0
+                ? word.slice(0, revealCount) + '•'.repeat(word.length - revealCount)
+                : '•'.repeat(word.length);
             return (
               <motion.li
                 key={word}
@@ -27,10 +34,12 @@ export function FoundWordsList({ required, found, largeText }: FoundWordsListPro
                 } ${
                   isFound
                     ? 'border-moss bg-moss/15 text-cocoa'
-                    : 'border-cocoa/30 bg-cream text-cocoa/40'
+                    : revealCount > 0
+                      ? 'border-gold/60 bg-gold/10 text-cocoa'
+                      : 'border-cocoa/30 bg-cream text-cocoa/40'
                 }`}
               >
-                {isFound ? word : '•'.repeat(word.length)}
+                {display}
               </motion.li>
             );
           })}
