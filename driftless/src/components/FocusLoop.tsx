@@ -5,9 +5,17 @@ import { FocusRing } from './FocusRing';
 import { useFocusTimer } from '@/hooks/useFocusTimer';
 import { useWakeLock } from '@/hooks/useWakeLock';
 import { usePersistentState } from '@/hooks/usePersistentState';
+import { useSoundscape } from '@/hooks/useSoundscape';
 import { haptic, HAPTIC } from '@/lib/haptics';
 import { DEFAULT_DURATION_MS, DURATIONS, randomTask, TASK_SUGGESTIONS } from '@/lib/tasks';
+import type { Soundscape } from '@/lib/soundscape';
 import driftlessIcon from '../assets/logo/driftless-icon.svg';
+
+const SOUND_OPTIONS: Array<{ id: Soundscape; label: string }> = [
+  { id: 'quiet', label: 'quiet' },
+  { id: 'rain', label: 'rain' },
+  { id: 'drone', label: 'drone' },
+];
 
 const fade = {
   initial: { opacity: 0, y: 10 },
@@ -22,10 +30,19 @@ export function FocusLoop() {
   const [task, setTask] = usePersistentState<string>('lastTask', '');
   const [durationMs, setDurationMs] = usePersistentState<number>('lastDuration', DEFAULT_DURATION_MS);
   const [hapticsOn, setHapticsOn] = usePersistentState<boolean>('haptics', true);
+  const [soundscape, setSoundscape] = usePersistentState<Soundscape>('soundscape', 'quiet');
+  const [soundVolume, setSoundVolume] = usePersistentState<number>('soundVolume', 0.4);
   const [toast, setToast] = useState<string | null>(null);
 
   const inFocus = timer.status === 'running' || timer.status === 'paused' || timer.status === 'complete';
   useWakeLock(timer.status === 'running');
+
+  // Drive the soundscape engine from the timer state. Audio only plays while
+  // a session is running; pauses when the user pauses; stops on complete or
+  // when the user leaves Focus Loop.
+  const soundState: 'playing' | 'paused' | 'stopped' =
+    timer.status === 'running' ? 'playing' : timer.status === 'paused' ? 'paused' : 'stopped';
+  useSoundscape({ preset: soundscape, volume: soundVolume, state: soundState });
 
   // Gentle "you came back" when the tab returns mid-session.
   const wasHidden = useRef(false);
@@ -151,6 +168,36 @@ export function FocusLoop() {
                       <span className="fl-duration__label">{d.label}</span>
                     </button>
                   ))}
+                </div>
+
+                <div className="fl-sound">
+                  <div className="fl-sound__label">with sound</div>
+                  <div className="fl-sound__row" role="group" aria-label="background sound">
+                    {SOUND_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.id}
+                        className={`fl-sound__chip${soundscape === opt.id ? ' is-on' : ''}`}
+                        onClick={() => { setSoundscape(opt.id); haptic(hapticsOn, HAPTIC.tap); }}
+                        aria-pressed={soundscape === opt.id}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {soundscape !== 'quiet' && (
+                    <label className="fl-sound__vol">
+                      <span className="fl-sound__vol-label">volume</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={soundVolume}
+                        onChange={(e) => setSoundVolume(parseFloat(e.target.value))}
+                        aria-label="sound volume"
+                      />
+                    </label>
+                  )}
                 </div>
 
                 <button className="fl-begin press" onClick={begin}>
