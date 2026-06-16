@@ -67,4 +67,9 @@ export function useSoundscape({ preset, volume, state }: UseSoundscapeArgs) {
       engineRef.current = null;
     };
   }, []);
+
+  /** Call inside a user gesture (the begin tap / sound-chip tap) to unlock iOS audio. */
+  const prime = () => engineRef.current?.prime();
+
+  return { prime };
 }

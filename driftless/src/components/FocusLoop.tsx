@@ -42,7 +42,7 @@ export function FocusLoop() {
   // when the user leaves Focus Loop.
   const soundState: 'playing' | 'paused' | 'stopped' =
     timer.status === 'running' ? 'playing' : timer.status === 'paused' ? 'paused' : 'stopped';
-  useSoundscape({ preset: soundscape, volume: soundVolume, state: soundState });
+  const { prime: primeSound } = useSoundscape({ preset: soundscape, volume: soundVolume, state: soundState });
 
   // Gentle "you came back" when the tab returns mid-session.
   const wasHidden = useRef(false);
@@ -79,6 +79,8 @@ export function FocusLoop() {
   const effectiveTask = task.trim() || 'this one thing';
 
   function begin() {
+    // Unlock iOS audio synchronously, inside this tap, before any async work.
+    if (soundscape !== 'quiet') primeSound();
     haptic(hapticsOn, HAPTIC.begin);
     timer.start(durationMs);
   }
@@ -177,7 +179,11 @@ export function FocusLoop() {
                       <button
                         key={opt.id}
                         className={`fl-sound__chip${soundscape === opt.id ? ' is-on' : ''}`}
-                        onClick={() => { setSoundscape(opt.id); haptic(hapticsOn, HAPTIC.tap); }}
+                        onClick={() => {
+                          if (opt.id !== 'quiet') primeSound();
+                          setSoundscape(opt.id);
+                          haptic(hapticsOn, HAPTIC.tap);
+                        }}
                         aria-pressed={soundscape === opt.id}
                       >
                         {opt.label}

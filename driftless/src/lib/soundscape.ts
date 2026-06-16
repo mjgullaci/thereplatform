@@ -17,6 +17,8 @@ const FADE_OUT_SEC = 1.8;
 type Teardown = () => void;
 
 export interface SoundscapeEngine {
+  /** MUST be called synchronously inside a user gesture (iOS unlock). */
+  prime: () => void;
   start: (preset: Soundscape, volume: number) => Promise<void>;
   stop: () => Promise<void>;
   setPreset: (preset: Soundscape, volume: number) => Promise<void>;
@@ -32,17 +34,55 @@ export function createSoundscapeEngine(): SoundscapeEngine {
   let teardown: Teardown | null = null;
   let currentPreset: Soundscape = 'quiet';
 
-  async function ensureContext() {
-    if (ctx) return ctx;
+  function buildContext() {
+    if (ctx) return;
     const Ctx =
       (window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }).AudioContext ||
       (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctx) throw new Error('Web Audio API not available');
+    if (!Ctx) return;
+    // Tell iOS (16.4+) this is media playback, so it plays even when the
+    // ringer/mute switch is on. No-op where unsupported.
+    try {
+      const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
+      if (session) session.type = 'playback';
+    } catch {
+      // ignore
+    }
     ctx = new Ctx();
-    if (ctx.state === 'suspended') await ctx.resume();
     master = ctx.createGain();
     master.gain.value = 0;
     master.connect(ctx.destination);
+  }
+
+  /**
+   * Synchronous iOS unlock. Must be invoked from inside a user gesture
+   * (e.g. the "begin" tap). Creates the context, kicks resume(), and plays
+   * a one-sample silent buffer to satisfy Safari's autoplay gate.
+   */
+  function prime() {
+    try {
+      buildContext();
+      if (!ctx) return;
+      if (ctx.state === 'suspended') void ctx.resume();
+      const buffer = ctx.createBuffer(1, 1, 22050);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
+    } catch {
+      // ignore — unlock is best-effort
+    }
+  }
+
+  async function ensureContext() {
+    if (!ctx) buildContext();
+    if (ctx && ctx.state === 'suspended') {
+      try {
+        await ctx.resume();
+      } catch {
+        // ignore
+      }
+    }
     return ctx;
   }
 
@@ -130,7 +170,7 @@ export function createSoundscapeEngine(): SoundscapeEngine {
     }
   }
 
-  return { start, stop, setPreset, setVolume, pause, resume, dispose };
+  return { prime, start, stop, setPreset, setVolume, pause, resume, dispose };
 }
 
 /* ------------------------------ presets ------------------------------ */
