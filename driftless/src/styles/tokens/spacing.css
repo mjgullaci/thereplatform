@@ -1,0 +1,32 @@
+/* Driftless spacing & radius. Generous negative space; rounded geometry 24–32px. */
+:root {
+  /* Spacing scale (4px base, but breathing room favored) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+
+  /* Screen padding — mobile-first, roomy */
+  --gutter: 24px;
+  --gutter-lg: 32px;
+
+  /* Radii — rounded, soft. Cards 24–32px. */
+  --radius-sm:    16px;
+  --radius-md:    20px;  /* buttons, chips */
+  --radius-lg:    28px;  /* cards, sheets */
+  --radius-xl:    32px;  /* hero surfaces */
+  --radius-pill:  999px; /* task chips, pills */
+  --radius-round: 50%;
+
+  /* Hit targets — never below 44px */
+  --tap-min: 44px;
+  --tap-comfortable: 56px;
+
+  /* Max content width on larger viewports (single-column, calm) */
+  --content-max: 480px;
+}

@@ -1,0 +1,16 @@
+/* Driftless elevation. Soft, dusk-tinted, low-contrast. No hard drop shadows. */
+:root {
+  /* Shadows — warm/dusk tint, wide & faint. Cards barely lift. */
+  --shadow-none: none;
+  --shadow-card:   0 2px 8px rgba(42,37,64,0.05), 0 8px 24px rgba(42,37,64,0.06);
+  --shadow-raised: 0 4px 14px rgba(42,37,64,0.07), 0 16px 40px rgba(42,37,64,0.08);
+  --shadow-sheet:  0 -8px 40px rgba(42,37,64,0.12);
+  --shadow-focal:  0 0 48px rgba(226,146,94,0.35); /* apricot glow halo */
+
+  /* Borders — hairline mist, used sparingly instead of shadow */
+  --border-hairline: 1px solid var(--hairline);
+  --border-faint:    1px solid rgba(42,37,64,0.06); /* @kind other */
+
+  /* Focus ring — apricot, soft, accessible */
+  --focus-ring: 0 0 0 3px rgba(226,146,94,0.45);
+}

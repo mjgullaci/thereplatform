@@ -1,0 +1,39 @@
+/* Driftless typography. Body 17–18px on mobile, line-height 1.5–1.6. Calm, never tight. */
+:root {
+  /* Families — two candidates share a body sans; swap the display var to switch. */
+  --font-sans:  'Manrope', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: 'Newsreader', Georgia, 'Times New Roman', serif;
+
+  /* Active display family — set by the chosen type pair.
+     Candidate 1 (Quiet Sans):  --font-display: var(--font-sans)
+     Candidate 2 (Soft Serif):  --font-display: var(--font-serif) */
+  --font-display: var(--font-sans);
+  --font-body:    var(--font-sans);
+
+  /* Weights — kept light. ADHD-friendly = low visual pressure. */
+  --w-light: 300;     /* @kind font */
+  --w-regular: 400;   /* @kind font */
+  --w-medium: 500;    /* @kind font */
+  --w-semibold: 600;  /* @kind font */
+
+  /* Type scale (mobile-first; rem on 16px root) */
+  --fs-display:  2.5rem;   /* 40px — screen hero / one focal line */
+  --fs-title:    1.75rem;  /* 28px */
+  --fs-heading:  1.375rem; /* 22px */
+  --fs-subhead:  1.125rem; /* 18px */
+  --fs-body:     1.0625rem;/* 17px — default body */
+  --fs-body-lg:  1.125rem; /* 18px */
+  --fs-label:    0.9375rem;/* 15px */
+  --fs-caption:  0.8125rem;/* 13px */
+
+  /* Line heights — generous */
+  --lh-tight: 1.2;    /* @kind font */
+  --lh-snug:  1.35;   /* @kind font */
+  --lh-body:  1.55;   /* @kind font */
+
+  /* Letter-spacing — display tracks slightly negative, labels slightly open */
+  --ls-display: -0.015em; /* @kind font */
+  --ls-body:    0em;      /* @kind font */
+  --ls-label:   0.01em;   /* @kind font */
+  --ls-allcaps: 0.08em;   /* @kind font */
+}

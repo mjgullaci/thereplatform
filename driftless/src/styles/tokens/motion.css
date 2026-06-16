@@ -1,0 +1,27 @@
+/* Driftless motion. Slow, gentle. 250–400ms. No bounce on content, no snap. */
+:root {
+  /* Durations */
+  --dur-fast:   180ms;  /* @kind other */
+  --dur-base:   280ms;  /* @kind other */
+  --dur-slow:   360ms;  /* @kind other */
+  --dur-drift:  400ms;  /* @kind other */
+  --dur-loop:   1500ms; /* @kind other */
+
+  /* Eases — drift settles, never overshoots content */
+  --ease-drift: cubic-bezier(0.25, 0.6, 0.25, 1); /* @kind other */
+  --ease-calm:  cubic-bezier(0.4, 0.0, 0.2, 1);   /* @kind other */
+  --ease-rest:  cubic-bezier(0.33, 0.0, 0.0, 1);  /* @kind other */
+
+  /* Press feedback — shrink, never grow (no bounce) */
+  --press-scale: 0.97; /* @kind other */
+}
+
+/* Honor reduced motion globally for consumers */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms; /* @kind other */
+    --dur-base: 0ms; /* @kind other */
+    --dur-slow: 0ms; /* @kind other */
+    --dur-drift: 0ms; /* @kind other */
+  }
+}

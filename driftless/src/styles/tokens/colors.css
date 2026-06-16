@@ -1,0 +1,52 @@
+/* Driftless palette — use these values exactly. Warm, low-stimulation, dusk-anchored. */
+:root {
+  /* ---- Brand base ---- */
+  --dusk-deep:  #2A2540;  /* deepest background, hero bottom */
+  --dusk-top:   #46406F;  /* hero top */
+  --indigo:     #5B5A8C;  /* muted structural accent / muted text on light */
+  --sage:       #6FA89B;  /* calm / complete / restful affirmation */
+  --apricot:    #E2925E;  /* the focal point — primary action, the "one thing" */
+  --clay:       #C9714A;  /* apricot pressed / deeper warm */
+  --rose:       #D98F86;  /* soft warm secondary, gentle highlight */
+  --oat:        #F4ECE0;  /* card / raised surface on cream */
+  --cream:      #FBF5EB;  /* app background, lightest */
+  --mist:       #E7DECF;  /* hairline borders, dividers, low chrome */
+
+  /* Derived tints (harmonious, not new hues) */
+  --mark-line:  #C9C2E0;  /* faint spiral line — indigo lifted toward light */
+  --apricot-soft: #F4C79A; /* focal glow inner */
+  --dusk-veil:  rgba(42,37,64,0.55); /* scrim over hero */
+
+  /* ---- Semantic: surfaces ---- */
+  --bg-app:        var(--cream);
+  --surface-card:  var(--oat);
+  --surface-raised:#FFFDF9;
+  --surface-sunken:#F0E7D8;
+  --surface-dusk:  var(--dusk-deep);
+  --hairline:      var(--mist);
+  --scrim:         var(--dusk-veil);
+
+  /* ---- Semantic: text ---- */
+  --text-body:     var(--dusk-deep);
+  --text-muted:    #6B6688;        /* indigo-grey, calm secondary */
+  --text-faint:    #9A93AE;        /* timestamps, hints */
+  --text-on-dusk:  var(--cream);
+  --text-on-dusk-muted: #B8B2D0;
+
+  /* ---- Semantic: action ---- */
+  --accent:        var(--apricot);
+  --accent-press:  var(--clay);
+  --accent-on:     #3A2415;        /* text/icon on apricot fill */
+  --affirm:        var(--sage);    /* "you came back. that counts." */
+  --secondary:     var(--rose);
+
+  /* ---- Semantic: state ---- */
+  --danger:        #B0463A;        /* ONLY destructive confirm — restrained, never harsh */
+  --danger-soft:   #E8C4BD;
+
+  /* ---- Hero gradient (top -> bottom) ---- */
+  --hero-from: var(--dusk-top);
+  --hero-to:   var(--dusk-deep);
+  --hero-gradient: linear-gradient(180deg, var(--dusk-top) 0%, var(--dusk-deep) 100%);
+  --focal-glow: radial-gradient(circle, var(--apricot-soft) 0%, var(--apricot) 45%, rgba(226,146,94,0) 100%);
+}
