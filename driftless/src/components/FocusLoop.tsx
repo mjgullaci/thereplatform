@@ -92,7 +92,7 @@ export function FocusLoop() {
     timer.reset();
   }
 
-  const runningLabel = timer.status === 'paused' ? 'paused — no rush' : 'staying with it';
+  const runningLabel = timer.status === 'paused' ? 'paused. no rush.' : 'staying with it';
 
   return (
     <div className={`fl-root${inFocus ? ' is-focusing' : ''}`}>
@@ -119,7 +119,7 @@ export function FocusLoop() {
                   className="fl-input"
                   value={task}
                   onChange={(e) => setTask(e.target.value)}
-                  placeholder="name it, gently — or pick one below"
+                  placeholder="name it, gently. or pick one below"
                   inputMode="text"
                   enterKeyHint="done"
                   aria-label="the one thing you'll focus on"
@@ -193,7 +193,7 @@ export function FocusLoop() {
                   i did it&nbsp;✓
                 </button>
                 <button className="fl-secondary" onClick={pickSomethingSmaller}>
-                  not now — pick something smaller
+                  not now. pick something smaller.
                 </button>
               </div>
             </motion.section>

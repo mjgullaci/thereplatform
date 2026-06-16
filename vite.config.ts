@@ -14,7 +14,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'Wordwell — Daily Word Puzzles',
+        name: 'Wordwell. Daily Word Puzzles',
         short_name: 'Wordwell',
         description: 'A cozy daily word puzzle. Find the words, keep your streak.',
         theme_color: '#5b3a29',

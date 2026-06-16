@@ -15,7 +15,7 @@ export function About() {
         <p>
           It's the first title from <strong>Hearthword Games</strong>, an indie studio
           focused on calm, accessible brain games for people who play in the quiet bits of
-          the day — morning coffee, the train, before bed.
+          the day. Morning coffee, the train, before bed.
         </p>
         <p>
           The game is designed to be unhurried. Large‑text mode is one tap away in
@@ -32,7 +32,7 @@ export function About() {
 
         <h2 className="font-display text-cocoa text-xl mt-6 mb-1">Contact</h2>
         <p>
-          Feedback, bug reports, theme suggestions, or just a hello — email{' '}
+          Feedback, bug reports, theme suggestions, or just a hello. Email{' '}
           <a
             href="mailto:mjgullaci@gmail.com?subject=Wordwell"
             className="underline underline-offset-4"

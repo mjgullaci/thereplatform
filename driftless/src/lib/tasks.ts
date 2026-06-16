@@ -1,7 +1,7 @@
 /** Gentle, low-friction task suggestions in the Driftless voice. */
 export const TASK_SUGGESTIONS = [
   'reply to the message you keep leaving',
-  'open the thing — just open it',
+  'open the thing. just open it.',
   'tidy one surface',
   'drink a glass of water',
   'write the first sentence',

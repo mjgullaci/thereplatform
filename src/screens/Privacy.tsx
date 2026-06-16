@@ -16,9 +16,9 @@ export function Privacy() {
 
         <h2>What we collect on this device</h2>
         <p>
-          Your game progress — daily streak, total puzzles solved, words found, large‑text
-          preference, hint balance and premium status — is stored in your browser's local
-          storage on your device. It never leaves your device.
+          Your game progress is stored in your browser's local storage on your device.
+          That includes daily streak, total puzzles solved, words found, large text
+          preference, hint balance and premium status. It never leaves your device.
         </p>
 
         <h2>What we collect on our servers</h2>

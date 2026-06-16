@@ -152,7 +152,7 @@ export function DailyPuzzle() {
   const handleShare = async () => {
     const required = puzzle.required.length;
     const url = `${window.location.origin}/`;
-    const title = `Wordwell — ${puzzle.theme}`;
+    const title = `Wordwell: ${puzzle.theme}`;
     const body = isPractice
       ? `Solved a Wordwell practice puzzle: ${puzzle.theme}. Found ${found.length} words.\n${url}`
       : `Solved today's Wordwell: ${puzzle.theme}. ${found.length} of ${required} required words found.\n${url}`;

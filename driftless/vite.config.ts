@@ -14,10 +14,10 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'driftless-icon.svg'],
       manifest: {
-        name: 'Driftless — focus, gently',
+        name: 'Driftless. Focus, gently.',
         short_name: 'Driftless',
         description:
-          'Calm, short-session focus games. Made for adults with ADHD brains.',
+          'Calm focus games, short sessions, made for adults with ADHD brains.',
         theme_color: '#2A2540',
         background_color: '#FBF5EB',
         display: 'standalone',

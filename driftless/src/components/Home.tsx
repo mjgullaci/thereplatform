@@ -4,7 +4,7 @@ import driftlessIcon from '../assets/logo/driftless-icon.svg';
 const WAITLIST_MAILTO =
   'mailto:mjgullaci@gmail.com' +
   '?subject=' +
-  encodeURIComponent('driftless — early list') +
+  encodeURIComponent('driftless: early list') +
   '&body=' +
   encodeURIComponent(
     "i'd like to know when driftless opens up. (no info needed beyond the email this is sent from.)",
@@ -23,7 +23,7 @@ export function Home() {
             focus, <em>gently</em>.
           </h1>
           <p className="hero__sub">
-            calm, short-session focus games. made for adults with ADHD brains.
+            calm focus games. short sessions. made for adults with ADHD brains.
           </p>
           <Link to="/focus" className="hero__cta press">
             try focus loop
@@ -50,8 +50,8 @@ export function Home() {
             <li className="principle__item">
               <h3 className="principle__name">staying with it.</h3>
               <p className="principle__body">
-                sessions are minutes, not hours. when you wander off mid-task — and
-                you will — the app doesn't punish you for coming back.
+                sessions are minutes, not hours. you'll wander off (it's
+                what brains do). when you come back, the app doesn't punish you.
               </p>
             </li>
             <li className="principle__item">
@@ -75,7 +75,7 @@ export function Home() {
               i have severe, diagnosed, medicated ADHD. i made driftless because every
               focus app i tried was either a clinical lecture or a slot machine. this
               is the one i want to use.
-              <span className="founder__by">— matthew, founder</span>
+              <span className="founder__by">Matthew, founder</span>
             </blockquote>
           </div>
         </div>
@@ -86,7 +86,7 @@ export function Home() {
           <div className="waitlist">
             <h2 className="waitlist__title">give it a try.</h2>
             <p className="waitlist__sub">
-              this is an early build — rough edges and all. tell me what feels good
+              this is an early build, rough edges and all. tell me what feels good
               and what's annoying.
             </p>
             <Link to="/focus" className="waitlist__cta press">

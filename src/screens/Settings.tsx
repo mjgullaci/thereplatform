@@ -55,7 +55,7 @@ export function Settings() {
           <div>
             <div className="font-display text-xl text-cocoa">Wordwell Premium</div>
             <div className="text-cocoa/70 text-sm">
-              {isPremium ? 'Active — thank you for supporting Wordwell' : 'Unlimited hints, no ads, all packs included'}
+              {isPremium ? 'Active. Thank you for supporting Wordwell.' : 'Unlimited hints, no ads, all packs included'}
             </div>
           </div>
           {!isPremium && (
