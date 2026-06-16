@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "wordwell",
+  "name": "driftless",
   "compatibility_date": "2025-12-01",
   "assets": {
     "directory": "./dist",
