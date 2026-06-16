@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import driftlessIcon from '../assets/logo/driftless-icon.svg';
 
 const WAITLIST_MAILTO =
@@ -24,10 +25,10 @@ export function Home() {
           <p className="hero__sub">
             calm, short-session focus games. made for adults with ADHD brains.
           </p>
-          <a href={WAITLIST_MAILTO} className="hero__cta press">
-            join the early list
-          </a>
-          <p className="hero__caption">opens an email — that's the whole signup.</p>
+          <Link to="/focus" className="hero__cta press">
+            try focus loop
+          </Link>
+          <p className="hero__caption">no signup. just one quiet thing at a time.</p>
         </div>
       </header>
 
@@ -83,14 +84,14 @@ export function Home() {
       <section className="section">
         <div className="container">
           <div className="waitlist">
-            <h2 className="waitlist__title">be the first to try it.</h2>
+            <h2 className="waitlist__title">give it a try.</h2>
             <p className="waitlist__sub">
-              we'll email once when there's something real to play. no list rental,
-              no funnel, no newsletter.
+              this is an early build — rough edges and all. tell me what feels good
+              and what's annoying.
             </p>
-            <a href={WAITLIST_MAILTO} className="waitlist__cta press">
-              join the early list
-            </a>
+            <Link to="/focus" className="waitlist__cta press">
+              open focus loop
+            </Link>
           </div>
         </div>
       </section>
