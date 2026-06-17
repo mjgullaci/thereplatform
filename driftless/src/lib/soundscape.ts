@@ -1,23 +1,30 @@
 /**
- * Driftless soundscape engine. Web Audio API, ADHD-aware.
+ * Driftless soundscape engine. HTMLAudioElement-based.
  *
- * Two presets — rain (filtered brown noise) and drone (three detuned sines
- * with slow breath modulation, light convolver reverb). Both fade in and
- * out gently. Master gain is owned by the engine so the React layer just
- * tells it "play this at this volume" and never touches Web Audio nodes.
+ * Why not Web Audio synthesis: on iOS Safari with audioSession.type =
+ * 'playback' (which we need so the silent switch doesn't mute us), pure
+ * Web Audio synthesis nodes register a media session but produce no
+ * audible output. HTMLAudioElement playback of real files is the reliable
+ * iOS path — the OS treats it as media, routes it through the lock screen
+ * / Control Center, and plays through the silent switch.
  *
- * Lazy AudioContext (created on first start() — user gesture required).
+ * Two presets: 'rain' and 'drone'. WAVs are generated at build time by
+ * scripts/generate-sounds.mjs and live in public/sounds/.
  */
 
 export type Soundscape = 'quiet' | 'rain' | 'drone';
 
 const FADE_IN_SEC = 2.5;
 const FADE_OUT_SEC = 1.8;
+const VOL_TRIM_SEC = 0.4;
 
-type Teardown = () => void;
+const FILES: Record<Exclude<Soundscape, 'quiet'>, string> = {
+  rain: '/sounds/rain.wav',
+  drone: '/sounds/drone.wav',
+};
 
 export interface SoundscapeEngine {
-  /** MUST be called synchronously inside a user gesture (iOS unlock). */
+  /** Call inside a user gesture to unlock iOS audio for both presets. */
   prime: () => void;
   start: (preset: Soundscape, volume: number) => Promise<void>;
   stop: () => Promise<void>;
@@ -29,303 +36,171 @@ export interface SoundscapeEngine {
 }
 
 export function createSoundscapeEngine(): SoundscapeEngine {
-  let ctx: AudioContext | null = null;
-  let master: GainNode | null = null;
-  let teardown: Teardown | null = null;
+  const elements: Partial<Record<Exclude<Soundscape, 'quiet'>, HTMLAudioElement>> = {};
+  const fades = new Map<HTMLAudioElement, number>();
   let currentPreset: Soundscape = 'quiet';
+  let unlocked = false;
 
-  function buildContext() {
-    if (ctx) return;
-    const Ctx =
-      (window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }).AudioContext ||
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctx) return;
-    // Tell iOS (16.4+) this is media playback, so it plays even when the
-    // ringer/mute switch is on. No-op where unsupported.
-    try {
-      const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
-      if (session) session.type = 'playback';
-    } catch {
-      // ignore
+  // Ask iOS (16.4+) to treat our audio as media playback so it plays through
+  // the silent switch. No-op on browsers without audioSession.
+  try {
+    const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
+    if (session) session.type = 'playback';
+  } catch {
+    // ignore
+  }
+
+  function getElement(preset: Exclude<Soundscape, 'quiet'>): HTMLAudioElement {
+    const cached = elements[preset];
+    if (cached) return cached;
+    const el = new Audio(FILES[preset]);
+    el.loop = true;
+    el.preload = 'auto';
+    el.volume = 0;
+    // Avoid the lock-screen poster being a giant black square
+    el.setAttribute('playsinline', '');
+    elements[preset] = el;
+    return el;
+  }
+
+  function cancelFade(el: HTMLAudioElement) {
+    const h = fades.get(el);
+    if (h !== undefined) {
+      cancelAnimationFrame(h);
+      fades.delete(el);
     }
-    ctx = new Ctx();
-    master = ctx.createGain();
-    master.gain.value = 0;
-    master.connect(ctx.destination);
+  }
+
+  function fade(el: HTMLAudioElement, target: number, durationSec: number, onDone?: () => void) {
+    cancelFade(el);
+    const from = el.volume;
+    const start = performance.now();
+    const tick = () => {
+      const elapsed = (performance.now() - start) / 1000;
+      const t = Math.min(1, elapsed / Math.max(0.001, durationSec));
+      el.volume = Math.max(0, Math.min(1, from + (target - from) * t));
+      if (t < 1) {
+        fades.set(el, requestAnimationFrame(tick));
+      } else {
+        fades.delete(el);
+        onDone?.();
+      }
+    };
+    fades.set(el, requestAnimationFrame(tick));
   }
 
   /**
-   * Synchronous iOS unlock. Must be invoked from inside a user gesture
-   * (e.g. the "begin" tap). Creates the context, kicks resume(), and plays
-   * a one-sample silent buffer to satisfy Safari's autoplay gate.
+   * iOS unlock. Must be invoked synchronously from a user gesture.
+   * Plays both preset elements at volume 0; once the play() promises
+   * resolve, the audio session is unlocked and subsequent play() calls
+   * (from non-gesture contexts) succeed.
    */
   function prime() {
-    try {
-      buildContext();
-      if (!ctx) return;
-      if (ctx.state === 'suspended') void ctx.resume();
-      const buffer = ctx.createBuffer(1, 1, 22050);
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(ctx.destination);
-      source.start(0);
-    } catch {
-      // ignore — unlock is best-effort
-    }
-  }
-
-  async function ensureContext() {
-    if (!ctx) buildContext();
-    if (ctx && ctx.state === 'suspended') {
+    if (unlocked) return;
+    unlocked = true;
+    for (const key of Object.keys(FILES) as Array<Exclude<Soundscape, 'quiet'>>) {
       try {
-        await ctx.resume();
+        const el = getElement(key);
+        el.volume = 0;
+        // play() inside the gesture — promise resolves asynchronously
+        // but the unlock is granted at call time.
+        const p = el.play();
+        if (p && typeof p.catch === 'function') p.catch(() => { /* unlock best-effort */ });
       } catch {
         // ignore
       }
     }
-    return ctx;
   }
 
-  function fadeMaster(targetGain: number, durationSec: number) {
-    if (!ctx || !master) return;
-    const now = ctx.currentTime;
-    master.gain.cancelScheduledValues(now);
-    master.gain.setValueAtTime(master.gain.value, now);
-    master.gain.linearRampToValueAtTime(Math.max(0, Math.min(1, targetGain)), now + durationSec);
-  }
-
-  async function teardownCurrent() {
-    if (!teardown) return;
-    fadeMaster(0, FADE_OUT_SEC);
-    await new Promise((r) => setTimeout(r, FADE_OUT_SEC * 1000 + 50));
-    try {
-      teardown();
-    } catch {
-      // ignore teardown errors
+  async function ensurePlaying(el: HTMLAudioElement) {
+    if (el.paused) {
+      try {
+        await el.play();
+      } catch {
+        // iOS may reject if not unlocked — caller will retry via prime/begin
+      }
     }
-    teardown = null;
   }
 
-  async function spinUp(preset: Soundscape) {
-    if (preset === 'quiet' || !ctx || !master) return;
-    if (preset === 'rain') teardown = createRain(ctx, master);
-    else if (preset === 'drone') teardown = createDrone(ctx, master);
+  async function fadeOutAndPause(el: HTMLAudioElement) {
+    return new Promise<void>((resolve) => {
+      if (el.paused) {
+        el.volume = 0;
+        resolve();
+        return;
+      }
+      fade(el, 0, FADE_OUT_SEC, () => {
+        try { el.pause(); } catch { /* ignore */ }
+        resolve();
+      });
+    });
   }
 
   async function start(preset: Soundscape, volume: number) {
     currentPreset = preset;
-    if (preset === 'quiet') return;
-    await ensureContext();
-    if (!ctx || !master) return;
-    await teardownCurrent();
-    await spinUp(preset);
-    fadeMaster(volume, FADE_IN_SEC);
+    if (preset === 'quiet') {
+      await stop();
+      return;
+    }
+    // Fade out any other preset that's playing
+    for (const [key, el] of Object.entries(elements) as Array<[Exclude<Soundscape, 'quiet'>, HTMLAudioElement]>) {
+      if (key === preset || !el) continue;
+      if (!el.paused) void fadeOutAndPause(el);
+    }
+    const el = getElement(preset);
+    await ensurePlaying(el);
+    fade(el, volume, FADE_IN_SEC);
   }
 
   async function stop() {
-    await teardownCurrent();
+    const promises: Array<Promise<void>> = [];
+    for (const el of Object.values(elements)) {
+      if (el && !el.paused) promises.push(fadeOutAndPause(el));
+    }
+    await Promise.all(promises);
   }
 
   async function setPreset(preset: Soundscape, volume: number) {
-    if (preset === currentPreset && teardown) {
-      setVolume(volume);
+    if (preset === currentPreset && preset !== 'quiet') {
+      const el = elements[preset as Exclude<Soundscape, 'quiet'>];
+      if (el) {
+        await ensurePlaying(el);
+        fade(el, volume, VOL_TRIM_SEC);
+      }
       return;
     }
-    currentPreset = preset;
-    if (preset === 'quiet') {
-      await teardownCurrent();
-      return;
-    }
-    await ensureContext();
-    await teardownCurrent();
-    await spinUp(preset);
-    fadeMaster(volume, FADE_IN_SEC);
+    await start(preset, volume);
   }
 
   function setVolume(volume: number) {
     if (currentPreset === 'quiet') return;
-    fadeMaster(volume, 0.4);
+    const el = elements[currentPreset as Exclude<Soundscape, 'quiet'>];
+    if (el) fade(el, volume, VOL_TRIM_SEC);
   }
 
   async function pause() {
-    if (!ctx) return;
-    if (ctx.state === 'running') await ctx.suspend();
+    for (const el of Object.values(elements)) {
+      if (el && !el.paused) {
+        try { el.pause(); } catch { /* ignore */ }
+      }
+    }
   }
 
   async function resume() {
-    if (!ctx) return;
-    if (ctx.state === 'suspended') await ctx.resume();
+    if (currentPreset === 'quiet') return;
+    const el = elements[currentPreset as Exclude<Soundscape, 'quiet'>];
+    if (el) await ensurePlaying(el);
   }
 
   async function dispose() {
-    await teardownCurrent();
-    if (ctx) {
-      try {
-        await ctx.close();
-      } catch {
-        // ignore close errors
-      }
-      ctx = null;
-      master = null;
+    for (const el of Object.values(elements)) {
+      if (!el) continue;
+      cancelFade(el);
+      try { el.pause(); } catch { /* ignore */ }
+      try { el.removeAttribute('src'); el.load(); } catch { /* ignore */ }
     }
+    fades.clear();
   }
 
   return { prime, start, stop, setPreset, setVolume, pause, resume, dispose };
-}
-
-/* ------------------------------ presets ------------------------------ */
-
-/** Brown-noise rain with a slow intensity LFO. */
-function createRain(ctx: AudioContext, dest: AudioNode): Teardown {
-  const bufferSeconds = 8;
-  const buffer = ctx.createBuffer(2, ctx.sampleRate * bufferSeconds, ctx.sampleRate);
-  for (let ch = 0; ch < 2; ch++) {
-    const data = buffer.getChannelData(ch);
-    let last = 0;
-    for (let i = 0; i < data.length; i++) {
-      const white = Math.random() * 2 - 1;
-      last = (last + 0.02 * white) / 1.02;
-      data[i] = last * 3.2;
-    }
-  }
-  const source = ctx.createBufferSource();
-  source.buffer = buffer;
-  source.loop = true;
-
-  const highpass = ctx.createBiquadFilter();
-  highpass.type = 'highpass';
-  highpass.frequency.value = 80;
-
-  const lowpass = ctx.createBiquadFilter();
-  lowpass.type = 'lowpass';
-  lowpass.frequency.value = 1200;
-  lowpass.Q.value = 0.7;
-
-  const intensity = ctx.createGain();
-  intensity.gain.value = 1.0;
-
-  const lfo = ctx.createOscillator();
-  lfo.frequency.value = 0.05;
-  const lfoDepth = ctx.createGain();
-  lfoDepth.gain.value = 0.18;
-  lfo.connect(lfoDepth).connect(intensity.gain);
-
-  source.connect(highpass).connect(lowpass).connect(intensity).connect(dest);
-  source.start();
-  lfo.start();
-
-  return () => {
-    try { source.stop(); } catch {
-      // already stopped
-    }
-    try { lfo.stop(); } catch {
-      // already stopped
-    }
-    source.disconnect();
-    lfo.disconnect();
-    lfoDepth.disconnect();
-    intensity.disconnect();
-    lowpass.disconnect();
-    highpass.disconnect();
-  };
-}
-
-/** Three detuned sine pads (A2 / E3 / A3) with chorus, breath LFO, and reverb tail. */
-function createDrone(ctx: AudioContext, dest: AudioNode): Teardown {
-  const freqs = [110, 164.81, 220]; // A2, E3, A3
-  const pans = [-0.4, 0, 0.4];
-
-  const reverb = ctx.createConvolver();
-  reverb.buffer = createReverbImpulse(ctx, 3.4, 2.2);
-
-  const wet = ctx.createGain();
-  wet.gain.value = 0.5;
-  const dry = ctx.createGain();
-  dry.gain.value = 1.0;
-
-  const warmth = ctx.createBiquadFilter();
-  warmth.type = 'lowpass';
-  warmth.frequency.value = 1400;
-  warmth.Q.value = 0.5;
-
-  const breath = ctx.createGain();
-  breath.gain.value = 0.55;
-
-  const breathLfo = ctx.createOscillator();
-  breathLfo.frequency.value = 0.08;
-  const breathDepth = ctx.createGain();
-  breathDepth.gain.value = 0.12;
-  breathLfo.connect(breathDepth).connect(breath.gain);
-
-  warmth.connect(dry).connect(breath);
-  warmth.connect(reverb).connect(wet).connect(breath);
-  breath.connect(dest);
-  breathLfo.start();
-
-  const stoppers: Teardown[] = [];
-
-  for (let i = 0; i < freqs.length; i++) {
-    const partial = ctx.createGain();
-    partial.gain.value = 0.16;
-
-    const panner = ctx.createStereoPanner();
-    panner.pan.value = pans[i];
-
-    const oscA = ctx.createOscillator();
-    oscA.type = 'sine';
-    oscA.frequency.value = freqs[i];
-    oscA.detune.value = -4;
-
-    const oscB = ctx.createOscillator();
-    oscB.type = 'sine';
-    oscB.frequency.value = freqs[i];
-    oscB.detune.value = +4;
-
-    oscA.connect(partial);
-    oscB.connect(partial);
-    partial.connect(panner).connect(warmth);
-
-    oscA.start();
-    oscB.start();
-
-    stoppers.push(() => {
-      try { oscA.stop(); } catch {
-        // already stopped
-      }
-      try { oscB.stop(); } catch {
-        // already stopped
-      }
-      oscA.disconnect();
-      oscB.disconnect();
-      partial.disconnect();
-      panner.disconnect();
-    });
-  }
-
-  return () => {
-    stoppers.forEach((s) => s());
-    try { breathLfo.stop(); } catch {
-      // already stopped
-    }
-    breathLfo.disconnect();
-    breathDepth.disconnect();
-    breath.disconnect();
-    warmth.disconnect();
-    reverb.disconnect();
-    wet.disconnect();
-    dry.disconnect();
-  };
-}
-
-/** Synthesized exponential-decay impulse response, no audio assets needed. */
-function createReverbImpulse(ctx: AudioContext, durationSec: number, decay: number): AudioBuffer {
-  const length = Math.floor(ctx.sampleRate * durationSec);
-  const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
-  for (let ch = 0; ch < 2; ch++) {
-    const data = impulse.getChannelData(ch);
-    for (let i = 0; i < length; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
-    }
-  }
-  return impulse;
 }
