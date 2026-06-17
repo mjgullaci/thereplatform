@@ -24,8 +24,12 @@ const FILES: Record<Exclude<Soundscape, 'quiet'>, string> = {
 };
 
 export interface SoundscapeEngine {
-  /** Call inside a user gesture to unlock iOS audio for both presets. */
-  prime: () => void;
+  /**
+   * Call inside the user gesture that's about to play this preset.
+   * Each preset must be primed inside its own gesture on iOS — a single
+   * "unlock all" only sticks for the element played first.
+   */
+  prime: (preset: Soundscape) => void;
   start: (preset: Soundscape, volume: number) => Promise<void>;
   stop: () => Promise<void>;
   setPreset: (preset: Soundscape, volume: number) => Promise<void>;
@@ -39,7 +43,6 @@ export function createSoundscapeEngine(): SoundscapeEngine {
   const elements: Partial<Record<Exclude<Soundscape, 'quiet'>, HTMLAudioElement>> = {};
   const fades = new Map<HTMLAudioElement, number>();
   let currentPreset: Soundscape = 'quiet';
-  let unlocked = false;
 
   // Ask iOS (16.4+) to treat our audio as media playback so it plays through
   // the silent switch. No-op on browsers without audioSession.
@@ -57,8 +60,17 @@ export function createSoundscapeEngine(): SoundscapeEngine {
     el.loop = true;
     el.preload = 'auto';
     el.volume = 0;
-    // Avoid the lock-screen poster being a giant black square
     el.setAttribute('playsinline', '');
+    // iOS Safari's loop=true is unreliable for short files; ended fires
+    // anyway. Manually seek + replay as a backup so playback never stops.
+    el.addEventListener('ended', () => {
+      try {
+        el.currentTime = 0;
+        void el.play().catch(() => { /* best effort */ });
+      } catch {
+        // ignore
+      }
+    });
     elements[preset] = el;
     return el;
   }
@@ -90,25 +102,22 @@ export function createSoundscapeEngine(): SoundscapeEngine {
   }
 
   /**
-   * iOS unlock. Must be invoked synchronously from a user gesture.
-   * Plays both preset elements at volume 0; once the play() promises
-   * resolve, the audio session is unlocked and subsequent play() calls
-   * (from non-gesture contexts) succeed.
+   * iOS unlock. Must be invoked synchronously from the user gesture that
+   * will play this preset. Each element needs its own gesture-driven
+   * play(); a one-shot "unlock all" only sticks for the first element
+   * played, so switching presets fails the second time. Calling prime()
+   * with the specific preset on every chip-tap and the begin-tap keeps
+   * every element unlocked when it's actually needed.
    */
-  function prime() {
-    if (unlocked) return;
-    unlocked = true;
-    for (const key of Object.keys(FILES) as Array<Exclude<Soundscape, 'quiet'>>) {
-      try {
-        const el = getElement(key);
-        el.volume = 0;
-        // play() inside the gesture — promise resolves asynchronously
-        // but the unlock is granted at call time.
-        const p = el.play();
-        if (p && typeof p.catch === 'function') p.catch(() => { /* unlock best-effort */ });
-      } catch {
-        // ignore
-      }
+  function prime(preset: Soundscape) {
+    if (preset === 'quiet') return;
+    try {
+      const el = getElement(preset);
+      el.volume = 0;
+      const p = el.play();
+      if (p && typeof p.catch === 'function') p.catch(() => { /* best effort */ });
+    } catch {
+      // ignore
     }
   }
 

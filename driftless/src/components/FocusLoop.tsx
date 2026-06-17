@@ -79,8 +79,10 @@ export function FocusLoop() {
   const effectiveTask = task.trim() || 'this one thing';
 
   function begin() {
-    // Unlock iOS audio synchronously, inside this tap, before any async work.
-    if (soundscape !== 'quiet') primeSound();
+    // Unlock iOS audio for this specific preset synchronously, inside this
+    // tap. Each preset element needs its own gesture-driven play() — passing
+    // the preset (not a no-arg call) is what makes switching reliable.
+    if (soundscape !== 'quiet') primeSound(soundscape);
     haptic(hapticsOn, HAPTIC.begin);
     timer.start(durationMs);
   }
@@ -180,7 +182,7 @@ export function FocusLoop() {
                         key={opt.id}
                         className={`fl-sound__chip${soundscape === opt.id ? ' is-on' : ''}`}
                         onClick={() => {
-                          if (opt.id !== 'quiet') primeSound();
+                          if (opt.id !== 'quiet') primeSound(opt.id);
                           setSoundscape(opt.id);
                           haptic(hapticsOn, HAPTIC.tap);
                         }}

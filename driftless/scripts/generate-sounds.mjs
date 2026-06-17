@@ -25,7 +25,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const SAMPLE_RATE = 22_050;
-const DURATION_SEC = 8;
+const DURATION_SEC = 20; // longer loop = fewer ended events on iOS where loop=true is flaky
 const NUM_SAMPLES = SAMPLE_RATE * DURATION_SEC;
 const FADE_SAMPLES = Math.round(SAMPLE_RATE * 0.035); // 35 ms edge fade
 

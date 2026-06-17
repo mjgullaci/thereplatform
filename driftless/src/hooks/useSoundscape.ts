@@ -68,8 +68,12 @@ export function useSoundscape({ preset, volume, state }: UseSoundscapeArgs) {
     };
   }, []);
 
-  /** Call inside a user gesture (the begin tap / sound-chip tap) to unlock iOS audio. */
-  const prime = () => engineRef.current?.prime();
+  /**
+   * Call inside the user gesture that's about to play this preset. iOS needs
+   * a gesture-driven play() per element; calling prime(preset) on the
+   * begin-tap and on each sound-chip tap keeps every element unlocked.
+   */
+  const prime = (preset: Soundscape) => engineRef.current?.prime(preset);
 
   return { prime };
 }
