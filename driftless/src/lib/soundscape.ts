@@ -1,15 +1,19 @@
 /**
- * Driftless soundscape engine. HTMLAudioElement-based.
+ * Driftless soundscape engine. Single-element, src-swapping design.
  *
- * Why not Web Audio synthesis: on iOS Safari with audioSession.type =
- * 'playback' (which we need so the silent switch doesn't mute us), pure
- * Web Audio synthesis nodes register a media session but produce no
- * audible output. HTMLAudioElement playback of real files is the reliable
- * iOS path — the OS treats it as media, routes it through the lock screen
- * / Control Center, and plays through the silent switch.
+ * Why this shape:
+ *   On iOS Safari, only the first HTMLAudioElement you play()  inside a
+ *   user gesture actually becomes the page's audio source. A second
+ *   element looks unlocked but emits no sound — switching presets fails.
+ *   Using ONE element and changing its `src` is the bulletproof pattern.
  *
- * Two presets: 'rain' and 'drone'. WAVs are generated at build time by
- * scripts/generate-sounds.mjs and live in public/sounds/.
+ * Each user gesture (chip tap / begin tap) calls prime(preset). Prime
+ * swaps the src if needed and play()s inside the gesture, so iOS keeps
+ * the unlock current for the file we're about to play. The React effect
+ * then fades the volume up via raf, no second gesture required.
+ *
+ * Real audio files are pre-rendered by scripts/generate-sounds.mjs and
+ * served from /sounds/. Web Audio API is intentionally not used.
  */
 
 export type Soundscape = 'quiet' | 'rain' | 'drone';
@@ -24,11 +28,7 @@ const FILES: Record<Exclude<Soundscape, 'quiet'>, string> = {
 };
 
 export interface SoundscapeEngine {
-  /**
-   * Call inside the user gesture that's about to play this preset.
-   * Each preset must be primed inside its own gesture on iOS — a single
-   * "unlock all" only sticks for the element played first.
-   */
+  /** Call inside the user gesture that's about to play this preset. */
   prime: (preset: Soundscape) => void;
   start: (preset: Soundscape, volume: number) => Promise<void>;
   stop: () => Promise<void>;
@@ -40,12 +40,13 @@ export interface SoundscapeEngine {
 }
 
 export function createSoundscapeEngine(): SoundscapeEngine {
-  const elements: Partial<Record<Exclude<Soundscape, 'quiet'>, HTMLAudioElement>> = {};
-  const fades = new Map<HTMLAudioElement, number>();
+  let el: HTMLAudioElement | null = null;
+  let fadeHandle: number | null = null;
   let currentPreset: Soundscape = 'quiet';
+  let loadedFile: string | null = null;
 
-  // Ask iOS (16.4+) to treat our audio as media playback so it plays through
-  // the silent switch. No-op on browsers without audioSession.
+  // Ask iOS (16.4+) to treat our audio as media playback so the silent
+  // switch doesn't mute it. No-op on browsers without audioSession.
   try {
     const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
     if (session) session.type = 'playback';
@@ -53,96 +54,98 @@ export function createSoundscapeEngine(): SoundscapeEngine {
     // ignore
   }
 
-  function getElement(preset: Exclude<Soundscape, 'quiet'>): HTMLAudioElement {
-    const cached = elements[preset];
-    if (cached) return cached;
-    const el = new Audio(FILES[preset]);
+  function ensureElement(): HTMLAudioElement {
+    if (el) return el;
+    el = new Audio();
     el.loop = true;
     el.preload = 'auto';
     el.volume = 0;
     el.setAttribute('playsinline', '');
-    // iOS Safari's loop=true is unreliable for short files; ended fires
-    // anyway. Manually seek + replay as a backup so playback never stops.
+    // iOS Safari's loop=true is unreliable for short files — ended fires
+    // anyway. Manually seek + replay so playback never stops.
     el.addEventListener('ended', () => {
+      const node = el;
+      if (!node) return;
       try {
-        el.currentTime = 0;
-        void el.play().catch(() => { /* best effort */ });
+        node.currentTime = 0;
+        void node.play().catch(() => { /* best effort */ });
       } catch {
         // ignore
       }
     });
-    elements[preset] = el;
     return el;
   }
 
-  function cancelFade(el: HTMLAudioElement) {
-    const h = fades.get(el);
-    if (h !== undefined) {
-      cancelAnimationFrame(h);
-      fades.delete(el);
+  function loadSrcIfNeeded(file: string) {
+    const node = ensureElement();
+    if (loadedFile === file) return;
+    node.src = file;
+    loadedFile = file;
+    try {
+      node.load();
+    } catch {
+      // ignore
     }
   }
 
-  function fade(el: HTMLAudioElement, target: number, durationSec: number, onDone?: () => void) {
-    cancelFade(el);
-    const from = el.volume;
-    const start = performance.now();
+  function cancelFade() {
+    if (fadeHandle !== null) {
+      cancelAnimationFrame(fadeHandle);
+      fadeHandle = null;
+    }
+  }
+
+  function fade(target: number, durationSec: number, onDone?: () => void) {
+    const node = el;
+    if (!node) return;
+    cancelFade();
+    const from = node.volume;
+    const startedAt = performance.now();
     const tick = () => {
-      const elapsed = (performance.now() - start) / 1000;
+      if (!el) return;
+      const elapsed = (performance.now() - startedAt) / 1000;
       const t = Math.min(1, elapsed / Math.max(0.001, durationSec));
       el.volume = Math.max(0, Math.min(1, from + (target - from) * t));
       if (t < 1) {
-        fades.set(el, requestAnimationFrame(tick));
+        fadeHandle = requestAnimationFrame(tick);
       } else {
-        fades.delete(el);
+        fadeHandle = null;
         onDone?.();
       }
     };
-    fades.set(el, requestAnimationFrame(tick));
+    fadeHandle = requestAnimationFrame(tick);
   }
 
   /**
-   * iOS unlock. Must be invoked synchronously from the user gesture that
-   * will play this preset. Each element needs its own gesture-driven
-   * play(); a one-shot "unlock all" only sticks for the first element
-   * played, so switching presets fails the second time. Calling prime()
-   * with the specific preset on every chip-tap and the begin-tap keeps
-   * every element unlocked when it's actually needed.
+   * Synchronous iOS unlock for the preset that's about to play. MUST be
+   * called from inside the user gesture (chip tap / begin tap). Sets the
+   * src if it needs to change, then calls play() while still inside the
+   * gesture — which is the only way iOS grants the unlock for the new src.
    */
   function prime(preset: Soundscape) {
     if (preset === 'quiet') return;
+    const file = FILES[preset];
     try {
-      const el = getElement(preset);
-      el.volume = 0;
-      const p = el.play();
+      const node = ensureElement();
+      loadSrcIfNeeded(file);
+      node.volume = 0;
+      const p = node.play();
       if (p && typeof p.catch === 'function') p.catch(() => { /* best effort */ });
     } catch {
       // ignore
     }
   }
 
-  async function ensurePlaying(el: HTMLAudioElement) {
-    if (el.paused) {
+  async function ensurePlaying() {
+    const node = el;
+    if (!node) return;
+    if (node.paused) {
       try {
-        await el.play();
+        await node.play();
       } catch {
-        // iOS may reject if not unlocked — caller will retry via prime/begin
+        // best effort — caller may re-prime
       }
     }
-  }
-
-  async function fadeOutAndPause(el: HTMLAudioElement) {
-    return new Promise<void>((resolve) => {
-      if (el.paused) {
-        el.volume = 0;
-        resolve();
-        return;
-      }
-      fade(el, 0, FADE_OUT_SEC, () => {
-        try { el.pause(); } catch { /* ignore */ }
-        resolve();
-      });
-    });
   }
 
   async function start(preset: Soundscape, volume: number) {
@@ -151,31 +154,30 @@ export function createSoundscapeEngine(): SoundscapeEngine {
       await stop();
       return;
     }
-    // Fade out any other preset that's playing
-    for (const [key, el] of Object.entries(elements) as Array<[Exclude<Soundscape, 'quiet'>, HTMLAudioElement]>) {
-      if (key === preset || !el) continue;
-      if (!el.paused) void fadeOutAndPause(el);
-    }
-    const el = getElement(preset);
-    await ensurePlaying(el);
-    fade(el, volume, FADE_IN_SEC);
+    const file = FILES[preset];
+    loadSrcIfNeeded(file);
+    await ensurePlaying();
+    fade(volume, FADE_IN_SEC);
   }
 
   async function stop() {
-    const promises: Array<Promise<void>> = [];
-    for (const el of Object.values(elements)) {
-      if (el && !el.paused) promises.push(fadeOutAndPause(el));
+    const node = el;
+    if (!node) return;
+    if (node.paused) {
+      node.volume = 0;
+      return;
     }
-    await Promise.all(promises);
+    await new Promise<void>((resolve) => {
+      fade(0, FADE_OUT_SEC, () => {
+        try { node.pause(); } catch { /* ignore */ }
+        resolve();
+      });
+    });
   }
 
   async function setPreset(preset: Soundscape, volume: number) {
-    if (preset === currentPreset && preset !== 'quiet') {
-      const el = elements[preset as Exclude<Soundscape, 'quiet'>];
-      if (el) {
-        await ensurePlaying(el);
-        fade(el, volume, VOL_TRIM_SEC);
-      }
+    if (preset === currentPreset && preset !== 'quiet' && el && !el.paused) {
+      fade(volume, VOL_TRIM_SEC);
       return;
     }
     await start(preset, volume);
@@ -183,32 +185,28 @@ export function createSoundscapeEngine(): SoundscapeEngine {
 
   function setVolume(volume: number) {
     if (currentPreset === 'quiet') return;
-    const el = elements[currentPreset as Exclude<Soundscape, 'quiet'>];
-    if (el) fade(el, volume, VOL_TRIM_SEC);
+    fade(volume, VOL_TRIM_SEC);
   }
 
   async function pause() {
-    for (const el of Object.values(elements)) {
-      if (el && !el.paused) {
-        try { el.pause(); } catch { /* ignore */ }
-      }
+    if (el && !el.paused) {
+      try { el.pause(); } catch { /* ignore */ }
     }
   }
 
   async function resume() {
     if (currentPreset === 'quiet') return;
-    const el = elements[currentPreset as Exclude<Soundscape, 'quiet'>];
-    if (el) await ensurePlaying(el);
+    await ensurePlaying();
   }
 
   async function dispose() {
-    for (const el of Object.values(elements)) {
-      if (!el) continue;
-      cancelFade(el);
+    cancelFade();
+    if (el) {
       try { el.pause(); } catch { /* ignore */ }
       try { el.removeAttribute('src'); el.load(); } catch { /* ignore */ }
     }
-    fades.clear();
+    el = null;
+    loadedFile = null;
   }
 
   return { prime, start, stop, setPreset, setVolume, pause, resume, dispose };
