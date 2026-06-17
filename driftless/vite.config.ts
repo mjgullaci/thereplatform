@@ -1,8 +1,8 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,27 +12,20 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['favicon.svg', 'driftless-icon.svg'],
       manifest: {
-        name: 'Wordwell. Daily Word Puzzles',
-        short_name: 'Wordwell',
-        description: 'A cozy daily word puzzle. Find the words, keep your streak.',
-        theme_color: '#5b3a29',
-        background_color: '#fdf6ec',
+        name: 'Driftless. Focus, gently.',
+        short_name: 'Driftless',
+        description:
+          'Calm focus games, short sessions, made for adults with ADHD brains.',
+        theme_color: '#2A2540',
+        background_color: '#FBF5EB',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
         icons: [
-          {
-            src: '/icon-192.png',
-            sizes: '192x192',
-            type: 'image/png',
-          },
-          {
-            src: '/icon-512.png',
-            sizes: '512x512',
-            type: 'image/png',
-          },
+          { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
         ],
       },
     }),
@@ -44,6 +37,6 @@ export default defineConfig({
   },
   server: {
     host: true,
-    port: 5173,
+    port: 5174,
   },
 });

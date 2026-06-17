@@ -4,16 +4,24 @@ export interface PersistedState {
   streak: number;
   lastPlayedDate: string | null;
   solved: Record<string, string[]>;
+  solvedIds: string[];
   largeText: boolean;
   totalSolved: number;
+  hints: number;
+  isPremium: boolean;
+  revealedLetters: Record<string, Record<string, number>>;
 }
 
 const defaults: PersistedState = {
   streak: 0,
   lastPlayedDate: null,
   solved: {},
+  solvedIds: [],
   largeText: false,
   totalSolved: 0,
+  hints: 3,
+  isPremium: false,
+  revealedLetters: {},
 };
 
 export function loadState(): PersistedState {

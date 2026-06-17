@@ -1,19 +1,32 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useGame } from '@/lib/store';
-import { getPuzzleForDate } from '@/lib/puzzles';
+import { getDateIndex, getPuzzleByIndex, getTotalPuzzles } from '@/lib/puzzles';
 
 export function Home() {
+  const navigate = useNavigate();
   const streak = useGame((s) => s.streak);
   const totalSolved = useGame((s) => s.totalSolved);
   const largeText = useGame((s) => s.largeText);
 
   const today = new Date();
-  const puzzle = getPuzzleForDate(today);
+  const todayIndex = getDateIndex(today);
+  const puzzle = getPuzzleByIndex(todayIndex);
   const dateLabel = today.toLocaleDateString(undefined, {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
   });
+
+  const startPractice = () => {
+    const n = getTotalPuzzles();
+    if (n <= 1) {
+      navigate(`/play?practice=1&i=${todayIndex}`);
+      return;
+    }
+    let i = todayIndex;
+    while (i === todayIndex) i = Math.floor(Math.random() * n);
+    navigate(`/play?practice=1&i=${i}`);
+  };
 
   return (
     <section className="flex-1 flex flex-col items-center justify-center px-6 py-10 text-center">
@@ -32,7 +45,14 @@ export function Home() {
         Play
       </Link>
 
-      <div className="mt-12 grid grid-cols-2 gap-6 w-full max-w-xs">
+      <button
+        onClick={startPractice}
+        className="mt-3 text-cocoa/70 underline underline-offset-4 hover:text-cocoa"
+      >
+        Practice another puzzle
+      </button>
+
+      <div className="mt-10 grid grid-cols-2 gap-6 w-full max-w-xs">
         <Stat label="Streak" value={`${streak} day${streak === 1 ? '' : 's'}`} large={largeText} />
         <Stat label="Solved" value={`${totalSolved}`} large={largeText} />
       </div>

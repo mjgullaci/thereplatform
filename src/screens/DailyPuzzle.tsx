@@ -1,30 +1,75 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { LetterWheel } from '@/components/LetterWheel';
 import { FoundWordsList } from '@/components/FoundWordsList';
 import { ProgressBar } from '@/components/ProgressBar';
+import { HintButton } from '@/components/HintButton';
 import { useGame } from '@/lib/store';
 import {
+  getPuzzleByIndex,
   getPuzzleForDate,
+  getTotalPuzzles,
   isPuzzleComplete,
   validateGuess,
 } from '@/lib/puzzles';
 
 type Toast = { id: number; text: string; tone: 'good' | 'bad' | 'bonus' };
 
+function randomOtherIndex(current: number): number {
+  const n = getTotalPuzzles();
+  if (n <= 1) return current;
+  let next = current;
+  while (next === current) {
+    next = Math.floor(Math.random() * n);
+  }
+  return next;
+}
+
 export function DailyPuzzle() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  const isPractice = searchParams.get('practice') === '1';
+  const requestedIndex = Number.parseInt(searchParams.get('i') ?? '', 10);
+
   const largeText = useGame((s) => s.largeText);
   const appendFoundWord = useGame((s) => s.appendFoundWord);
   const recordWin = useGame((s) => s.recordWin);
-  const solved = useGame((s) => s.solved);
+  const persistentSolved = useGame((s) => s.solved);
+  const persistentReveals = useGame((s) => s.revealedLetters);
+  const hints = useGame((s) => s.hints);
+  const isPremium = useGame((s) => s.isPremium);
+  const useHintAction = useGame((s) => s.useHint);
 
-  const puzzle = useMemo(() => getPuzzleForDate(new Date()), []);
-  const found = solved[puzzle.id] ?? [];
+  const { puzzle, puzzleIndex } = useMemo(() => {
+    if (isPractice) {
+      const idx = Number.isFinite(requestedIndex)
+        ? Math.max(0, Math.min(requestedIndex, getTotalPuzzles() - 1))
+        : 0;
+      return { puzzle: getPuzzleByIndex(idx), puzzleIndex: idx };
+    }
+    return { puzzle: getPuzzleForDate(new Date()), puzzleIndex: -1 };
+  }, [isPractice, requestedIndex]);
+
+  const [practiceFound, setPracticeFound] = useState<string[]>([]);
+  const [practiceReveals, setPracticeReveals] = useState<Record<string, number>>({});
+  useEffect(() => {
+    setPracticeFound([]);
+    setPracticeReveals({});
+  }, [puzzle.id]);
+
+  const persistentFound = persistentSolved[puzzle.id] ?? [];
+  const found = isPractice ? practiceFound : persistentFound;
+  const revealed = isPractice ? practiceReveals : (persistentReveals[puzzle.id] ?? {});
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [shuffleSeed, setShuffleSeed] = useState(0);
   const [won, setWon] = useState(() => isPuzzleComplete(puzzle, found));
+
+  useEffect(() => {
+    setWon(isPuzzleComplete(puzzle, found));
+  }, [puzzle, found]);
 
   const shuffledLetters = useMemo(() => {
     if (shuffleSeed === 0) return puzzle.letters;
@@ -34,50 +79,97 @@ export function DailyPuzzle() {
       [arr[i], arr[j]] = [arr[j], arr[i]];
     }
     return arr;
-    // shuffleSeed intentionally re-runs this
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shuffleSeed, puzzle.letters]);
 
   useEffect(() => {
-    if (!won && isPuzzleComplete(puzzle, found)) {
-      setWon(true);
-      recordWin(puzzle.id, found);
+    if (!isPractice && isPuzzleComplete(puzzle, persistentFound)) {
+      recordWin(puzzle.id);
     }
-  }, [found, puzzle, recordWin, won]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persistentFound.length, puzzle.id, isPractice]);
 
   const pushToast = (text: string, tone: Toast['tone']) => {
     const id = Date.now() + Math.random();
     setToasts((t) => [...t, { id, text, tone }]);
-    setTimeout(() => {
-      setToasts((t) => t.filter((x) => x.id !== id));
-    }, 1400);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 1400);
   };
 
   const handleSubmit = (word: string) => {
     const result = validateGuess(puzzle, word);
-    if (result.status === 'too-short') {
-      pushToast('Too short', 'bad');
-      return;
-    }
-    if (result.status === 'unspellable') {
-      pushToast('Not in the wheel', 'bad');
-      return;
-    }
-    if (found.includes(result.word)) {
-      pushToast('Already found', 'bad');
-      return;
-    }
-    if (result.status === 'unknown') {
-      pushToast('Not a word we know', 'bad');
-      return;
-    }
-    appendFoundWord(puzzle.id, result.word);
-    if (result.status === 'bonus') {
-      pushToast(`Bonus! ${result.word}`, 'bonus');
-    } else if (result.status === 'extra') {
-      pushToast(`+ Bonus word: ${result.word}`, 'good');
+    if (result.status === 'too-short') return pushToast('Too short', 'bad');
+    if (result.status === 'unspellable') return pushToast('Not in the wheel', 'bad');
+    if (found.includes(result.word)) return pushToast('Already found', 'bad');
+    if (result.status === 'unknown') return pushToast('Not a word we know', 'bad');
+
+    if (isPractice) {
+      setPracticeFound((prev) => (prev.includes(result.word) ? prev : [...prev, result.word]));
     } else {
-      pushToast(`+ ${result.word}`, 'good');
+      appendFoundWord(puzzle.id, result.word);
+    }
+
+    if (result.status === 'bonus') pushToast(`Bonus! ${result.word}`, 'bonus');
+    else if (result.status === 'extra') pushToast(`+ Bonus word: ${result.word}`, 'good');
+    else pushToast(`+ ${result.word}`, 'good');
+  };
+
+  const handleHint = () => {
+    if (!isPremium && hints <= 0) {
+      navigate('/premium');
+      return;
+    }
+    const candidates = puzzle.required.filter((w) => {
+      if (found.includes(w)) return false;
+      const r = revealed[w] ?? 0;
+      return r < w.length;
+    });
+    if (candidates.length === 0) {
+      pushToast('No hints needed', 'good');
+      return;
+    }
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+
+    if (isPractice) {
+      // In practice, hints are free and stored locally.
+      setPracticeReveals((prev) => ({ ...prev, [pick]: (prev[pick] ?? 0) + 1 }));
+      pushToast(`Revealed a letter in ${pick.length}-letter word`, 'good');
+      return;
+    }
+
+    const ok = useHintAction(puzzle.id, pick);
+    if (!ok) {
+      pushToast('Could not use hint', 'bad');
+      return;
+    }
+    pushToast(`Revealed a letter in ${pick.length}-letter word`, 'good');
+  };
+
+  const goToAnotherPractice = () => {
+    const next = randomOtherIndex(isPractice ? puzzleIndex : -1);
+    navigate(`/play?practice=1&i=${next}`, { replace: true });
+  };
+
+  const handleShare = async () => {
+    const required = puzzle.required.length;
+    const url = `${window.location.origin}/`;
+    const title = `Wordwell: ${puzzle.theme}`;
+    const body = isPractice
+      ? `Solved a Wordwell practice puzzle: ${puzzle.theme}. Found ${found.length} words.\n${url}`
+      : `Solved today's Wordwell: ${puzzle.theme}. ${found.length} of ${required} required words found.\n${url}`;
+
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ title, text: body, url });
+        return;
+      } catch (err) {
+        if ((err as DOMException)?.name === 'AbortError') return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(body);
+      pushToast('Copied to clipboard', 'good');
+    } catch {
+      pushToast('Could not copy', 'bad');
     }
   };
 
@@ -87,7 +179,9 @@ export function DailyPuzzle() {
   return (
     <section className="flex-1 flex flex-col items-center pt-4 pb-8 gap-5 relative">
       <div className="text-center">
-        <div className="text-cocoa/60 text-sm uppercase tracking-widest">Today's theme</div>
+        <div className="text-cocoa/60 text-sm uppercase tracking-widest">
+          {isPractice ? 'Practice' : "Today's theme"}
+        </div>
         <div className={`font-display text-cocoa ${largeText ? 'text-3xl' : 'text-2xl'}`}>
           {puzzle.theme}
         </div>
@@ -97,14 +191,27 @@ export function DailyPuzzle() {
 
       <LetterWheel letters={shuffledLetters} onSubmit={handleSubmit} largeText={largeText} />
 
-      <button
-        onClick={() => setShuffleSeed((n) => n + 1)}
-        className="rounded-full border-2 border-cocoa/30 text-cocoa px-4 py-2 text-sm tracking-wider uppercase"
-      >
-        Shuffle
-      </button>
+      <div className="flex gap-3 items-center">
+        <button
+          onClick={() => setShuffleSeed((n) => n + 1)}
+          className="rounded-full border-2 border-cocoa/30 text-cocoa px-4 py-2 text-sm tracking-wider uppercase"
+        >
+          Shuffle
+        </button>
+        <HintButton
+          hints={hints}
+          isPremium={isPremium || isPractice}
+          disabled={won}
+          onClick={handleHint}
+        />
+      </div>
 
-      <FoundWordsList required={puzzle.required} found={found} largeText={largeText} />
+      <FoundWordsList
+        required={puzzle.required}
+        found={found}
+        revealed={revealed}
+        largeText={largeText}
+      />
 
       <AnimatePresence>
         {toasts.map((t) => (
@@ -141,21 +248,36 @@ export function DailyPuzzle() {
               className="bg-cream rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl"
             >
               <div className="text-cocoa/60 uppercase tracking-widest text-sm mb-2">
-                Puzzle solved
+                {isPractice ? 'Practice complete' : 'Puzzle solved'}
               </div>
               <div className={`font-display text-cocoa ${largeText ? 'text-3xl' : 'text-2xl'} mb-3`}>
                 {puzzle.theme}
               </div>
               <p className="text-cocoa/80 mb-6">
-                You found {found.length} word{found.length === 1 ? '' : 's'} today. Come back
-                tomorrow for a new puzzle.
+                {isPractice
+                  ? `You found ${found.length} word${found.length === 1 ? '' : 's'}.`
+                  : `You found ${found.length} word${found.length === 1 ? '' : 's'} today. Come back tomorrow for a new puzzle.`}
               </p>
-              <Link
-                to="/"
-                className="inline-block rounded-full bg-cocoa text-cream px-8 py-3 font-display text-xl"
-              >
-                Home
-              </Link>
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={handleShare}
+                  className="rounded-full bg-moss text-cream px-8 py-3 font-display text-xl"
+                >
+                  Share result
+                </button>
+                <button
+                  onClick={goToAnotherPractice}
+                  className="rounded-full bg-cocoa text-cream px-8 py-3 font-display text-lg"
+                >
+                  Try another puzzle
+                </button>
+                <Link
+                  to="/"
+                  className="rounded-full border-2 border-cocoa/30 text-cocoa px-8 py-3 font-display text-base"
+                >
+                  Home
+                </Link>
+              </div>
             </motion.div>
           </motion.div>
         )}
